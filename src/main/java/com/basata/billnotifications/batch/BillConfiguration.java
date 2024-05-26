@@ -23,8 +23,9 @@ import org.springframework.batch.item.support.CompositeItemProcessor;
 import org.springframework.batch.item.support.ListItemWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.DataClassRowMapper;
-import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -69,6 +70,7 @@ public class BillConfiguration {
                 .faultTolerant()
                 .retry(Exception.class)
                 .retryLimit(3)
+                //.taskExecutor(taskExecutor())
                 .build();
     }
 
@@ -85,13 +87,14 @@ public class BillConfiguration {
                                    ItemProcessor<ProcessedBillingData, ProcessedBillingData> compositeProcessor,
                                    ItemWriter<ProcessedBillingData> billItemWriter) {
         return new StepBuilder("getInquiryResponse", jobRepository)
-                .<ProcessedBillingData, ProcessedBillingData>chunk(100, transactionManager)
+                .<ProcessedBillingData, ProcessedBillingData>chunk(1, transactionManager)
                 .reader(listItemReader)
                 .processor(compositeProcessor)
                 .writer(billItemWriter)
                 .faultTolerant()
                 .retry(Exception.class)
                 .retryLimit(3)
+                .taskExecutor(taskExecutor())
                 .build();
     }
 
@@ -132,5 +135,10 @@ public class BillConfiguration {
         CompositeItemProcessor<ProcessedBillingData, ProcessedBillingData> processor = new CompositeItemProcessor<>();
         processor.setDelegates(Arrays.asList(getInquiryResponseProcessor, sendNotificationProcessor));
         return processor;
+    }
+
+    @Bean
+    public TaskExecutor taskExecutor() {
+        return new SimpleAsyncTaskExecutor("spring_batch");
     }
 }
